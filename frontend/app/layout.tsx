@@ -1,38 +1,40 @@
 import React from "react"
 import type { Metadata } from 'next'
-import { Space_Grotesk, DM_Sans } from 'next/font/google'
-import { Analytics } from '@vercel/analytics/next'
 import { Header } from '@/components/header'
 import { Footer } from '@/components/footer'
 import { Toaster } from '@/components/ui/toaster'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
+import { NetworkStatusBanner } from '@/components/network-status-banner'
+import SkipLink from '@/components/SkipLink'
+import { ServiceWorkerRegister } from '@/components/service-worker-register'
+import { SpeedInsights } from '@vercel/speed-insights/next'
+import { PerformanceMonitor } from '@/components/PerformanceMonitor'
+import { ThemeProvider } from '@/components/theme-provider'
+import { CurrencyProvider } from '@/contexts/CurrencyContext'
+import { WalletProvider } from '@/contexts/WalletContext'
+import { CookieConsentProvider } from '@/contexts/CookieConsentContext'
+import { CookieConsentBanner } from '@/components/CookieConsentBanner'
+import { Geist, Geist_Mono } from 'next/font/google'
 import './globals.css'
 
+const geistSans = Geist({
+  variable: '--font-geist-sans',
+  subsets: ['latin'],
+})
 
-
-const _spaceGrotesk = Space_Grotesk({ subsets: ["latin"], variable: '--font-heading' });
-const _dmSans = DM_Sans({ subsets: ["latin"], variable: '--font-body' });
+const geistMono = Geist_Mono({
+  variable: '--font-geist-mono',
+  subsets: ['latin'],
+})
 
 export const metadata: Metadata = {
-  title: 'Sheltaflex - Rent Now, Pay Later',
+  title: 'Shelterflex - Rent Now, Pay Later',
   description: 'The smarter way to pay your rent. Split your rent payments into affordable monthly installments.',
-  generator: 'v0.app',
+  manifest: '/manifest.json',
   icons: {
-    icon: [
-      {
-        url: '/icon-light-32x32.png',
-        media: '(prefers-color-scheme: light)',
-      },
-      {
-        url: '/icon-dark-32x32.png',
-        media: '(prefers-color-scheme: dark)',
-      },
-      {
-        url: '/icon.svg',
-        type: 'image/svg+xml',
-      },
-    ],
-    apple: '/apple-icon.png',
+    icon: '/icon.svg',
+    shortcut: '/icon.svg',
+    apple: '/icon.svg',
   },
 }
 
@@ -42,15 +44,37 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en">
-      <body className={`${_spaceGrotesk.variable} ${_dmSans.variable} font-sans antialiased`}>
-        <ErrorBoundary>
-          <Header />
-          {children}
-          <Footer />
-          <Toaster />
-          <Analytics />
-        </ErrorBoundary>
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <meta name="theme-color" content="#ff6b35" />
+      </head>
+      <body className={`${geistSans.variable} ${geistMono.variable} font-sans antialiased`}>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
+          <CurrencyProvider>
+            <WalletProvider>
+            <CookieConsentProvider>
+            <ErrorBoundary>
+              <ServiceWorkerRegister />
+              <SpeedInsights />
+              <PerformanceMonitor />
+              <NetworkStatusBanner />
+              <SkipLink />
+              <Header />
+              <div id="main-content" />
+              {children}
+              <Footer />
+              <Toaster />
+              <CookieConsentBanner />
+            </ErrorBoundary>
+            </CookieConsentProvider>
+            </WalletProvider>
+          </CurrencyProvider>
+        </ThemeProvider>
       </body>
     </html>
   )

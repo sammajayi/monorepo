@@ -1,21 +1,23 @@
 name: PR Validation
 
 on:
-  pull_request:
-    types: [opened, edited, synchronize]
+  workflow_dispatch:
+    inputs:
+      pr_body:
+        description: PR body content to validate
+        required: true
+        type: string
 
 jobs:
   validate-pr:
     runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
       - name: Validate PR body
         env:
-          PR_BODY: ${{ github.event.pull_request.body }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_BODY: ${{ github.event.inputs.pr_body }}
         run: |
           # Ensure PR body is not empty or just whitespace
           if [[ -z "$PR_BODY" || "$PR_BODY" =~ ^[[:space:]]*$ ]]; then
@@ -33,7 +35,8 @@ jobs:
           # Ensure required sections are present (basic check)
           required_sections=("## Summary" "## Changes" "## Checklist")
           for section in "${required_sections[@]}"; do
-            if [[ ! "$PR_BODY" =~ "$section" ]]; then
+            # Use unquoted section for regex match
+            if [[ ! "$PR_BODY" =~ $section ]]; then
               echo "::error::Missing required section: $section. Please use the PR template."
               exit 1
             fi

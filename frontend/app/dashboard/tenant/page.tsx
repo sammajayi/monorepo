@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import {
   Home,
@@ -8,7 +8,6 @@ import {
   CreditCard,
   MessageSquare,
   Settings,
-  Heart,
   Calendar,
   Clock,
   CheckCircle,
@@ -16,18 +15,26 @@ import {
   ArrowRight,
   MapPin,
   FileText,
+  ShieldCheck,
   Menu,
   X,
+  Gauge,
 } from "lucide-react";
+import { PropertyCard } from "@/components/property-card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { DashboardHeader } from "@/components/dashboard-header";
+import { TenantRewardsSummaryCard } from "@/components/tenant-rewards-summary-card";
 import {
   tenantCurrentLease as currentLease,
   tenantDashboardPaymentSchedule as paymentSchedule,
   tenantDashboardPastPayments as pastPayments,
   tenantSavedProperties as savedProperties,
 } from "@/lib/mockData";
+import { featureFlags } from "@/lib/featureFlags";
+import { getTenantPaymentStatusPresentation } from "@/lib/tenantPaymentStatus";
+import { apiFetch } from "@/lib/api";
 
 // Wallet balance - checked first before auto-deduction
 type PaymentItem =
@@ -49,6 +56,19 @@ export default function TenantDashboard() {
     "overview",
   );
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [onboardingStatus, setOnboardingStatus] = useState<{
+    completedSteps: string[];
+    currentStep: string;
+    submitted: boolean;
+  } | null>(null);
+
+  useEffect(() => {
+    apiFetch<{ completedSteps: string[]; currentStep: string; submitted: boolean }>(
+      "/api/onboarding/status"
+    )
+      .then(setOnboardingStatus)
+      .catch(() => {});
+  }, []);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("en-NG", {
@@ -59,48 +79,75 @@ export default function TenantDashboard() {
   };
 
   const getPaymentHistoryPresentation = (payment: PaymentItem) => {
-    const isPaid = payment.status === "paid";
-    const isUpcoming = payment.status === "upcoming";
-
-    let iconContainerClassName = "bg-muted";
-    if (isPaid) {
-      iconContainerClassName = "bg-secondary";
-    } else if (isUpcoming) {
-      iconContainerClassName = "bg-primary";
-    }
+    const statusPresentation = getTenantPaymentStatusPresentation(payment.status);
 
     let detailText = "";
-    if (isPaid) {
+    if (payment.status === "paid") {
       detailText = `Paid on ${payment.paidDate}`;
     } else {
       detailText = `Due ${payment.dueDate}`;
     }
 
-    let statusClassName = "text-muted-foreground";
-    if (isPaid) {
-      statusClassName = "text-secondary";
-    } else if (isUpcoming) {
-      statusClassName = "text-primary";
-    }
-
-    let statusLabel = "Pending";
-    if (isPaid) {
-      statusLabel = "Paid";
-    } else if (isUpcoming) {
-      statusLabel = "Due Soon";
-    }
-
     return {
       detailText,
-      iconContainerClassName,
-      statusClassName,
-      statusLabel,
+      statusPresentation,
     };
   };
+
+  const onboardingComplete = onboardingStatus?.submitted || false;
+  const onboardingProgress = onboardingStatus
+    ? Math.round((onboardingStatus.completedSteps.length / 5) * 100)
+    : 0;
+  const showOnboardingBanner = onboardingStatus && !onboardingStatus.submitted;
 
   return (
     <div className="min-h-screen bg-background">
       <DashboardHeader />
+
+      {/* Onboarding banner */}
+      {showOnboardingBanner && (
+        <div className="border-b-3 border-foreground bg-amber-50">
+          <div className="mx-auto max-w-7xl px-4 py-3 flex items-center justify-between gap-4 flex-wrap">
+            <div className="flex items-center gap-3">
+              <AlertCircle className="h-5 w-5 text-amber-600 shrink-0" />
+              <div>
+                <p className="text-sm font-semibold text-amber-900">
+                  Complete your profile to apply for properties
+                </p>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <div className="w-32 h-1.5 bg-amber-200 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-amber-500 rounded-full transition-all"
+                      style={{ width: `${onboardingProgress}%` }}
+                    />
+                  </div>
+                  <span className="text-xs text-amber-700">
+                    {onboardingStatus.completedSteps.length} / 5 steps
+                  </span>
+                </div>
+              </div>
+            </div>
+            <Link href="/onboarding">
+              <Button size="sm" className="bg-amber-600 hover:bg-amber-700 text-white border-none">
+                Continue
+                <ArrowRight className="h-4 w-4 ml-1" />
+              </Button>
+            </Link>
+          </div>
+        </div>
+      )}
+
+      {/* Assessment in progress banner */}
+      {onboardingComplete && (
+        <div className="border-b-3 border-foreground bg-blue-50">
+          <div className="mx-auto max-w-7xl px-4 py-3 flex items-center gap-3">
+            <ShieldCheck className="h-5 w-5 text-blue-600 shrink-0" />
+            <p className="text-sm font-semibold text-blue-900">
+              Assessment in progress — we will notify you once your profile is reviewed.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Mobile Menu Button */}
       <button
@@ -149,12 +196,28 @@ export default function TenantDashboard() {
               Payments
             </Link>
             <Link
+              href="/dashboard/tenant/credit-score"
+              className="flex items-center gap-3 border-3 border-foreground bg-card p-3 font-bold transition-all hover:bg-muted hover:shadow-[4px_4px_0px_0px_rgba(26,26,26,1)]"
+              onClick={() => setSidebarOpen(false)}
+            >
+              <Gauge className="h-5 w-5" />
+              Credit Score
+            </Link>
+            <Link
               href="/dashboard/tenant/lease"
               className="flex items-center gap-3 border-3 border-foreground bg-card p-3 font-bold transition-all hover:bg-muted hover:shadow-[4px_4px_0px_0px_rgba(26,26,26,1)]"
               onClick={() => setSidebarOpen(false)}
             >
               <FileText className="h-5 w-5" />
               My Lease
+            </Link>
+            <Link
+              href="/dashboard/tenant/vault"
+              className="flex items-center gap-3 border-3 border-foreground bg-card p-3 font-bold transition-all hover:bg-muted hover:shadow-[4px_4px_0px_0px_rgba(26,26,26,1)]"
+              onClick={() => setSidebarOpen(false)}
+            >
+              <ShieldCheck className="h-5 w-5" />
+              Document Vault
             </Link>
             <Link
               href="/properties"
@@ -382,13 +445,17 @@ export default function TenantDashboard() {
                   ))}
                 </div>
 
-                <Button className="mt-4 w-full border-3 border-foreground bg-primary font-bold shadow-[4px_4px_0px_0px_rgba(26,26,26,1)] transition-all hover:translate-x-0.5 hover:translate-y-0.5 hover:shadow-[2px_2px_0px_0px_rgba(26,26,26,1)]">
-                  Make Payment
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </Button>
-              </Card>
-            </div>
-          )}
+                  <Button className="mt-4 w-full border-3 border-foreground bg-primary font-bold shadow-[4px_4px_0px_0px_rgba(26,26,26,1)] transition-all hover:translate-x-0.5 hover:translate-y-0.5 hover:shadow-[2px_2px_0px_0px_rgba(26,26,26,1)]">
+                    Make Payment
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </Button>
+                </Card>
+
+                {featureFlags.enableExperimentalStaking && (
+                  <TenantRewardsSummaryCard />
+                )}
+              </div>
+            )}
 
           {/* Payment History Tab */}
           {activeTab === "payments" && (
@@ -408,7 +475,7 @@ export default function TenantDashboard() {
                     <div className="flex items-center gap-4">
                       <div
                         className={`flex h-10 w-10 items-center justify-center border-2 border-foreground ${
-                          presentation.iconContainerClassName
+                          presentation.statusPresentation.iconContainerClassName
                         }`}
                       >
                         {payment.status === "paid" ? (
@@ -428,13 +495,12 @@ export default function TenantDashboard() {
                       <p className="font-mono font-bold">
                         {formatCurrency(payment.amount)}
                       </p>
-                      <span
-                        className={`text-sm font-bold ${
-                          presentation.statusClassName
-                        }`}
+                      <Badge
+                        variant={presentation.statusPresentation.variant}
+                        className={presentation.statusPresentation.className}
                       >
-                        {presentation.statusLabel}
-                      </span>
+                        {presentation.statusPresentation.label}
+                      </Badge>
                     </div>
                   </div>
                     );
@@ -447,33 +513,33 @@ export default function TenantDashboard() {
           {/* Saved Properties Tab */}
           {activeTab === "saved" && (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {savedProperties.map((property) => (
-                <Card
-                  key={property.id}
-                  className="border-3 border-foreground p-0 shadow-[4px_4px_0px_0px_rgba(26,26,26,1)]"
-                >
-                  <div className="relative border-b-3 border-foreground bg-muted p-8">
-                    <Building2 className="mx-auto h-12 w-12 text-muted-foreground" />
-                    <button className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center border-2 border-foreground bg-background">
-                      <Heart className="h-4 w-4 fill-destructive text-destructive" />
-                    </button>
-                  </div>
-                  <div className="p-4">
-                    <h4 className="font-bold">{property.title}</h4>
-                    <p className="text-sm text-muted-foreground">
-                      {property.location}
-                    </p>
-                    <p className="mt-2 text-lg font-bold text-primary">
-                      {formatCurrency(property.price)}/yr
-                    </p>
-                    <Link href={`/properties/${property.id}`}>
-                      <Button className="mt-3 w-full border-2 border-foreground bg-secondary font-bold">
-                        View Property
-                      </Button>
-                    </Link>
-                  </div>
-                </Card>
-              ))}
+              {savedProperties.map((property) => {
+                const locationParts = property.location
+                  .split(",")
+                  .map((part) => part.trim());
+                const area = locationParts[0];
+                const city = locationParts[1];
+
+                return (
+                  <PropertyCard
+                    key={property.id}
+                    property={{
+                      listingId: String(property.id),
+                      address: property.title,
+                      city,
+                      area,
+                      bedrooms: property.beds,
+                      bathrooms: property.baths,
+                      annualRentNgn: property.price,
+                      photos: property.photos,
+                      hasApprovedInspection: property.hasApprovedInspection,
+                      paymentType: property.paymentType,
+                    }}
+                    isFavorited
+                    href={`/properties/${property.id}`}
+                  />
+                );
+              })}
               <Card className="flex items-center justify-center border-3 border-dashed border-foreground p-8">
                 <Link href="/properties" className="text-center">
                   <Building2 className="mx-auto h-12 w-12 text-muted-foreground" />
