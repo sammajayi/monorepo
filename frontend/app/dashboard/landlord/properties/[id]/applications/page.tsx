@@ -19,7 +19,7 @@ import { propertyApplications, Applicant, landlordMyProperties } from "@/lib/moc
 
 export default function PropertyApplicationsPage() {
   const params = useParams();
-  const propertyId = parseInt(params.propertyId as string);
+  const propertyId = parseInt(params.id as string);
   const [selectedApplicant, setSelectedApplicant] = useState<Applicant | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "approved" | "rejected">("all");
